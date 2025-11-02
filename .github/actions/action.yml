@@ -212,6 +212,27 @@ runs:
         echo "KERNEL_FULL_VER=$ANDROID_VERSION-$FULL_VERSION" >> "$GITHUB_ENV"
         echo "SUSFS_KERNEL_BRANCH=gki-$ANDROID_VERSION-$VERSION.$PATCHLEVEL" >> "$GITHUB_ENV"
 
+# ADD THIS NEW STEP:
+    - name: Resolve Device Tree Merge Conflicts
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "$CONFIG/kernel_platform/common"
+
+        echo "🔧 Auto-resolving device tree merge conflicts..."
+
+        find arch/arm64/boot/dts -type f \( -name "*.dtsi" -o -name "*.dts" \) 2>/dev/null | while read file; do
+          if grep -q "<<<<<<< HEAD" "$file" 2>/dev/null; then
+            echo "Resolving: $(basename $file)"
+
+            # Keep HEAD version, remove everything after =======
+            sed -i '/^=======/,/^>>>>>>> /d' "$file"
+            sed -i '/<<<<<<< HEAD/d' "$file"
+          fi
+        done
+
+        echo "✅ Device tree conflicts resolved"
+
     - name: Clone AnyKernel3 and Other Dependencies
       shell: bash
       run: |
