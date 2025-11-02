@@ -44,7 +44,7 @@ jobs:
         id: build
         uses: ./.github/actions
         with:
-          op_config_json: '{"model":"OP12r","soc":"kalama","branch":"oneplus/sm8550","manifest":"oneplus_12r_v.xml","android_version":"android13","kernel_version":"5.15","hmbird":false,"custom_kernel_repo":"resurrected21/android_kernel_oneplus_sm8550","custom_kernel_branch":"upstream-12r"}'
+          op_config_json: '{"model":"OP12r","soc":"kalama","branch":"oneplus/sm8550","manifest":"oneplus_12r_v.xml","android_version":"android13","kernel_version":"5.15","hmbird":false,"custom_kernel_repo":"resurrected21/android_kernel_oneplus_sm8550","custom_kernel_branch":"Staged-patchfix"}'
           ksun_branch: ${{ inputs.ksun_branch }}
           susfs_commit_hash_or_branch: ${{ inputs.susfs_branch }}
           optimize_level: ${{ inputs.optimize_level }}
@@ -96,7 +96,7 @@ jobs:
           # OnePlus 12R KernelSU+SUSFS Build
           
           ## Build Information
-          - **Source**: resurrected21/android_kernel_oneplus_sm8550 @ upstream-12r
+          - **Source**: resurrected21/android_kernel_oneplus_sm8550 @ Staged-patchfix
           - **Build #**: ${{ github.run_number }}
           - **KernelSU Next**: ${{ inputs.ksun_branch }}
           - **Optimization**: ${{ inputs.optimize_level }}

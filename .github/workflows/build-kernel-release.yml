@@ -188,7 +188,7 @@ jobs:
           jq . configs/OP12r.json
           # Should show:
           # "custom_kernel_repo": "resurrected21/android_kernel_oneplus_sm8550"
-          # "custom_kernel_branch": "upstream-12r"
+          # "custom_kernel_branch": "Staged-patchfix"
           
       - name: Build Kernel
         uses: ./.github/actions
