@@ -155,15 +155,26 @@ runs:
     - name: Replace with Upstreamed Kernel
       shell: bash
       run: |
+        set -euo pipefail
         cd "$CONFIG"
-        echo "🔄 Replacing with upstreamed kernel..."
-        rm -rf kernel_platform/common
-        git clone https://github.com/resurrected21/android_kernel_oneplus_sm8550.git \
-          -b upstream-12r \
-          --depth=1 \
-          kernel_platform/common
-        echo "✅ Upstreamed kernel cloned from resurrected21"
-        cd kernel_platform/common && git log -1 --oneline
+        
+        # Use custom kernel repo if provided, otherwise skip
+        if [ -n "${OP_CUSTOM_KERNEL_REPO:-}" ] && [ -n "${OP_CUSTOM_KERNEL_BRANCH:-}" ]; then
+          echo "🔄 Using custom upstreamed kernel..."
+          echo "Repo: $OP_CUSTOM_KERNEL_REPO @ Branch: $OP_CUSTOM_KERNEL_BRANCH"
+          
+          rm -rf kernel_platform/common
+          git clone https://github.com/$OP_CUSTOM_KERNEL_REPO.git \
+            -b $OP_CUSTOM_KERNEL_BRANCH \
+            --depth=1 \
+            kernel_platform/common
+          
+          cd kernel_platform/common
+          echo "✅ Latest commit: $(git log -1 --oneline)"
+          cd "$GITHUB_WORKSPACE/$CONFIG"
+        else
+          echo "⚠️  No custom kernel specified, using stock OnePlus source"
+        fi
 
     - name: Get Kernel Version Info
       shell: bash
