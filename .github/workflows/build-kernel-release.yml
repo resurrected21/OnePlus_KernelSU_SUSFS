@@ -181,7 +181,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
+# ADD THIS STEP:
+      - name: Verify OP12r Config Uses Upstreamed Kernel
+        shell: bash
+        run: |
+          jq . configs/OP12r.json
+          # Should show:
+          # "custom_kernel_repo": "resurrected21/android_kernel_oneplus_sm8550"
+          # "custom_kernel_branch": "upstream-12r"
+          
       - name: Build Kernel
         uses: ./.github/actions
         with:
