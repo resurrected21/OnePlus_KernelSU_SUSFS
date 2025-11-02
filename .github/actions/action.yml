@@ -135,7 +135,7 @@ runs:
         if [[ "$OP_MANIFEST" == https://* ]]; then
           mkdir -p .repo/manifests
           curl --fail --show-error --location --proto '=https' "$OP_MANIFEST" -o .repo/manifests/temp_manifest.xml
-          "$REPO" init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8650 -m temp_manifest.xml --repo-rev=v2.16 --depth=1 --no-clone-bundle --no-tags
+          "$REPO" init -u https://github.com/OnePlusOSS/kernel_manifest.git -b oneplus/sm8550 -m temp_manifest.xml --repo-rev=v2.16 --depth=1 --no-clone-bundle --no-tags
         else
           "$REPO" init -u https://github.com/OnePlusOSS/kernel_manifest.git -b "$OP_BRANCH" -m "$OP_MANIFEST" --repo-rev=v2.16 --depth=1 --no-clone-bundle --no-tags
         fi
@@ -151,6 +151,19 @@ runs:
           sleep 30
         done
         $success || { echo "repo sync failed after 3 attempts"; exit 1; }
+
+    - name: Replace with Upstreamed Kernel
+      shell: bash
+      run: |
+        cd "$CONFIG"
+        echo "🔄 Replacing with upstreamed kernel..."
+        rm -rf kernel_platform/common
+        git clone https://github.com/resurrected21/android_kernel_oneplus_sm8550.git \
+          -b upstream-12r \
+          --depth=1 \
+          kernel_platform/common
+        echo "✅ Upstreamed kernel cloned from resurrected21"
+        cd kernel_platform/common && git log -1 --oneline
 
     - name: Get Kernel Version Info
       shell: bash

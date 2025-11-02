@@ -1,0 +1,86 @@
+name: Build OP12r KernelSU+SUSFS
+
+permissions:
+  contents: write
+  actions: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      optimize_level:
+        description: 'Compiler optimization level'
+        required: true
+        type: choice
+        options: [O2, O3]
+        default: O2
+      ksun_branch:
+        description: 'KernelSU Next Branch'
+        required: true
+        type: string
+        default: next
+      make_release:
+        description: 'Create Release?'
+        required: true
+        type: boolean
+        default: true
+      susfs_branch:
+        description: 'SUSFS Branch (optional)'
+        type: string
+        default: ''
+
+jobs:
+  build:
+    name: Build OP12r Kernel
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Kernel
+        uses: ./.github/actions
+        with:
+          op_config_json: ${{ toJSON(fromJSON(readFile('configs/OP12r.json'))) }}
+          ksun_branch: ${{ inputs.ksun_branch }}
+          susfs_commit_hash_or_branch: ${{ inputs.susfs_branch }}
+          optimize_level: ${{ inputs.optimize_level }}
+
+  release:
+    needs: [build]
+    runs-on: ubuntu-latest
+    if: ${{ inputs.make_release }}
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: OP12r-${{ github.run_number }}
+          name: "OnePlus 12R Upstreamed Kernel - Build #${{ github.run_number }}"
+          files: artifacts/**/*.zip
+          body: |
+            ## OnePlus 12R KernelSU+SUSFS - Upstreamed Source
+            
+            **Kernel Source**: resurrected21/android_kernel_oneplus_sm8550 @ upstream-12r
+            **Build**: #${{ github.run_number }}
+            **KernelSU Next**: ${{ inputs.ksun_branch }}
+            **Optimization**: ${{ inputs.optimize_level }}
+            
+            ### Installation
+            1. Download ZIP
+            2. Boot to recovery (Orange State)
+            3. Flash ZIP
+            4. Reboot
+            5. Install KernelSU Manager APK
+            
+            ### Features
+            - KernelSU Next
+            - SUSFS v1.5.x
+            - BBR TCP Congestion Control
+            - IP Set Support
+            - Baseband Guard
+            - All OnePlus modules included
+            
+            **Source**: https://github.com/resurrected21/OnePlus_KernelSU_SUSFS
