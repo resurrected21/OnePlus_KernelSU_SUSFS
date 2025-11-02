@@ -18,28 +18,33 @@ on:
         required: true
         type: string
         default: next
+      susfs_branch:
+        description: 'SUSFS Branch (optional, auto-detected if blank)'
+        type: string
+        default: ''
       make_release:
         description: 'Create Release?'
         required: true
         type: boolean
         default: true
-      susfs_branch:
-        description: 'SUSFS Branch (optional)'
-        type: string
-        default: ''
 
 jobs:
   build:
     name: Build OP12r Kernel
     runs-on: ubuntu-latest
+    outputs:
+      kernel_version: ${{ steps.build.outputs.kernel_version }}
+      ksu_version: ${{ steps.build.outputs.ksu_version }}
+      susfs_version: ${{ steps.build.outputs.susfs_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build Kernel
+        id: build
         uses: ./.github/actions
         with:
-          op_config_json: ${{ toJSON(fromJSON(readFile('configs/OP12r.json'))) }}
+          op_config_json: '{"model":"OP12r","soc":"kalama","branch":"oneplus/sm8550","manifest":"oneplus_12r_v.xml","android_version":"android13","kernel_version":"5.15","hmbird":false,"custom_kernel_repo":"resurrected21/android_kernel_oneplus_sm8550","custom_kernel_branch":"upstream-12r"}'
           ksun_branch: ${{ inputs.ksun_branch }}
           susfs_commit_hash_or_branch: ${{ inputs.susfs_branch }}
           optimize_level: ${{ inputs.optimize_level }}
@@ -48,39 +53,95 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     if: ${{ inputs.make_release }}
+    env:
+      REPO_OWNER: ${{ github.repository_owner }}
+      REPO_NAME: ${{ github.event.repository.name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Tag
+        id: tag
+        shell: bash
+        run: |
+          BASE_TAG="OP12r-v1.0.0"
+          LATEST_TAG=$(gh api repos/$REPO_OWNER/$REPO_NAME/tags --jq '.[0].name' 2>/dev/null || echo "")
+          
+          if [ -z "$LATEST_TAG" ]; then
+            NEW_TAG="$BASE_TAG-r1"
+          else
+            # Extract version and increment
+            LATEST_NUM=$(echo "$LATEST_TAG" | grep -oE 'r[0-9]+$' | sed 's/r//' || echo "0")
+            NEW_NUM=$((LATEST_NUM + 1))
+            BASE=$(echo "$LATEST_TAG" | sed 's/-r[0-9]*$//')
+            NEW_TAG="$BASE-r$NEW_NUM"
+          fi
+          
+          echo "NEW_TAG=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          git tag "$NEW_TAG"
+          git push origin "$NEW_TAG"
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: OP12r-${{ github.run_number }}
-          name: "OnePlus 12R Upstreamed Kernel - Build #${{ github.run_number }}"
-          files: artifacts/**/*.zip
-          body: |
-            ## OnePlus 12R KernelSU+SUSFS - Upstreamed Source
-            
-            **Kernel Source**: resurrected21/android_kernel_oneplus_sm8550 @ upstream-12r
-            **Build**: #${{ github.run_number }}
-            **KernelSU Next**: ${{ inputs.ksun_branch }}
-            **Optimization**: ${{ inputs.optimize_level }}
-            
-            ### Installation
-            1. Download ZIP
-            2. Boot to recovery (Orange State)
-            3. Flash ZIP
-            4. Reboot
-            5. Install KernelSU Manager APK
-            
-            ### Features
-            - KernelSU Next
-            - SUSFS v1.5.x
-            - BBR TCP Congestion Control
-            - IP Set Support
-            - Baseband Guard
-            - All OnePlus modules included
-            
-            **Source**: https://github.com/resurrected21/OnePlus_KernelSU_SUSFS
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          cat > release_notes.md <<'EOF'
+          # OnePlus 12R KernelSU+SUSFS Build
+          
+          ## Build Information
+          - **Source**: resurrected21/android_kernel_oneplus_sm8550 @ upstream-12r
+          - **Build #**: ${{ github.run_number }}
+          - **KernelSU Next**: ${{ inputs.ksun_branch }}
+          - **Optimization**: ${{ inputs.optimize_level }}
+          - **Kernel Version**: ${{ needs.build.outputs.kernel_version }}
+          - **KSU Version**: ${{ needs.build.outputs.ksu_version }}
+          - **SUSFS Version**: ${{ needs.build.outputs.susfs_version }}
+          
+          ## Installation
+          1. Download the ZIP file below
+          2. Boot to recovery (Orange State / Fastboot)
+          3. Flash the ZIP via AnyKernel3
+          4. Reboot to system
+          5. Download & install KernelSU Manager APK
+          
+          ## Features
+          - ✅ KernelSU Next (v${{ needs.build.outputs.ksu_version }})
+          - ✅ SUSFS v${{ needs.build.outputs.susfs_version }}
+          - ✅ BBR TCP Congestion Control
+          - ✅ IP Set Support
+          - ✅ Baseband Guard (BBG)
+          - ✅ Magic Mount Support
+          - ✅ TMPFS XATTR Support
+          - ✅ All OnePlus modules included
+          
+          ## Links
+          - [KernelSU-Next Repository](https://github.com/KernelSU-Next/KernelSU-Next)
+          - [SUSFS Repository](https://gitlab.com/simonpunk/susfs4ksu)
+          - [WildKernels Source](https://github.com/resurrected21/OnePlus_KernelSU_SUSFS)
+          
+          ## Disclaimer
+          Flashing this kernel will void your warranty. Use at your own risk.
+          EOF
+          
+          gh release create "${{ steps.tag.outputs.NEW_TAG }}" \
+            --repo "$REPO_OWNER/$REPO_NAME" \
+            --title "OnePlus 12R Build #${{ github.run_number }}" \
+            --notes-file release_notes.md
+
+      - name: Upload Release Assets
+        shell: bash
+        run: |
+          for file in ./artifacts/kernel-OP12r/*.zip; do
+            if [ -f "$file" ]; then
+              echo "Uploading $(basename $file)..."
+              gh release upload "${{ steps.tag.outputs.NEW_TAG }}" "$file" --clobber \
+                --repo "$REPO_OWNER/$REPO_NAME"
+            fi
+          done
